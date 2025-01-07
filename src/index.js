@@ -11,10 +11,10 @@ dotenv.config({
 
 connectDB()
 .then(()=>{
-    app.listen(process.env.PORT || 8000, ()=>{
+    const server = app.listen(process.env.PORT || 8000, ()=>{
         console.log(`surver is, ${process.env.PORT}`)
     })
-    app.listen('error',(error)=>{
+    server.on('error',(error)=>{
       console.log('Error:',error)
     })
 })
