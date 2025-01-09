@@ -7,7 +7,8 @@ import {User} from '../modles/user.model.js'
 
 export const verifyJwt = asynchandler(  async(req, res, next,)=>{
  try {
-    const token =  req.cookies?.accessToken || req.Header('Authorization')?.replace('Bearer', "")
+    const token = req.cookies?.accessToken || req.Headres("Authorization")?.replace("Bearer ", "")
+    // console.log(token)
          if(!token){
            throw new ApiError(401, "Unauthorised request")
          }
@@ -26,6 +27,4 @@ export const verifyJwt = asynchandler(  async(req, res, next,)=>{
      throw new ApiError(401, error?.message || "inavalid token")
  }
    
-
-
 })
