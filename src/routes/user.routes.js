@@ -1,11 +1,20 @@
-import { Router } from 'express'; // Import Router from express
-import registerUser from '../controlers/user.controler.js' // Import the registerUser controller
+import { Router } from 'express';
+import {registerUser, loginUser, logoutUser } from '../controlers/user.controler.js';
+import { upload } from '../middlewares/multer.middleware.js';
+import {verifyJwt} from '../middlewares/auth.middleware.js'
 
-const router = Router(); // Initialize the router
+const router = Router();
 
-// Define the route for the 'register' endpoint
+// Define the route and apply multer middleware
+router.route('/register').post(
+    upload.fields([
+        { name: 'avatar', maxCount: 1 },
+        { name: 'coverImage', maxCount: 1 },
+    ]),
+    registerUser
+);
+router.route('/login').post(loginUser)
+//secured routes
+router.route('/logout').post(verifyJwt, logoutUser)
 
-router.route('/register').post(registerUser); // Map POST requests to the registerUser controller
-
-// Export the router
 export default router;

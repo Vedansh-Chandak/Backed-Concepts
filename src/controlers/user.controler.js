@@ -4,6 +4,19 @@ import {User} from '../modles/user.model.js';
 import {uploadOnCloudinary} from '../utils/cloudinary.js';
 import { Apiresponse } from '../utils/Apiresponse.js';
 
+const generateAccessandRefershToken = async (userId)=>{
+    try {
+     const user = await User.findById(userId)
+   const accessToken =  user.generateAccessToken()
+   const refreshToken =  user.generateRefreshToken()
+       user.refreshToken = refreshToken
+        await user.save({validateBeforeSave: false})
+        return {accessToken, refreshToken}     
+    } catch (error) {
+        throw new ApiError(500, 'something wenrt wrong while generating token')
+    }
+}
+
 const registerUser = asynchandler(async (req, res) => {
    //get user details from frontend
    //validation on details
@@ -25,11 +38,13 @@ const {fullname,email, username, password} = req.body
         throw new ApiError(400, 'All fields are requried')
     }
 
-    const existedUser = User.findOne({$or: [{ email }, { username }]})
+    const existedUser = await User.findOne({ $or: [{ email }, { username }]})
 
 if(existedUser){
     throw new ApiError(409, 'User already exit')
 }
+console.log(req.files)
+
 //geting path of avatar by multer
 const avatarLocalPath = req.files?.avatar[0]?.path;
 const coverImageLocalPath = req.files?.coverImage[0]?.path;
@@ -37,6 +52,7 @@ const coverImageLocalPath = req.files?.coverImage[0]?.path;
 if(!avatarLocalPath){
     throw new ApiError(400, 'Avatar is requried')
 }
+console.log(avatarLocalPath)
 //upload on cloudinary
 
 const avatar = await uploadOnCloudinary(avatarLocalPath);
@@ -67,4 +83,79 @@ return res.status(201).json(new Apiresponse(201, createdUser, 'User is registere
 
 });
 
-export default registerUser;
+const loginUser = asynchandler(async (req, res)=>{
+// req body -> data
+//username or email
+//find the user
+//check for password
+//accress and refresh token
+//send cookie
+//return response
+
+const {usernmae, email, password} = req.body
+if (!uername || !email) {
+    throw new ApiError(400, "username or paasword is requried")
+}
+
+const user = await User.findOne({$or: [{usernmae}, {email}]})
+if(!user){
+    throw new ApiError(400, "User not fornd")
+}
+
+const isPasswordValid = await user.isPasswordCorrect(password);
+if(!isPasswordValid){
+    throw new ApiError(401, "Invalid password")
+}
+
+const {accessToken, refreshToken} = await user.generateAccessandRefershToken(user._id)
+
+const loggedInUser =   User.findById(user._id).select('-password -refrenshToken')
+
+const options = {
+//for security purpose by this cokiee can modify only by server not by forntend
+
+  httpOnly: true,
+  secure: true
+
+}
+
+return res.status(200)
+.cokiee('accessToken', accessToken, options)
+.cokiee('refreshToken', refreshToken, options)
+.json(new Apiresponse(200,
+     {
+    user: loggedInUser, accessToken, refrenshToken
+    },
+    "user loggedin Successfully"
+))
+})
+
+const logoutUser = asynchandler(async (res, req)=>{
+  await User.findByIdAndUpdate(req.user._id, {
+    $set: {
+        refrenchToken: undefined
+    }
+  },
+{
+    new: true
+}
+)
+
+                 const options = {
+                    //for security purpose by this cokiee can modify only by server not by forntend
+                    
+                      httpOnly: true,
+                      secure: true
+                    
+                    }
+                    return res.
+                    status(200)
+                    .clearCookie('accessToken', options)
+                    .clearCookie('refrenchToken', options)
+                    .json(new Apiresponse(200, "user is loggedOut"))
+})
+
+
+
+
+export { registerUser, loginUser, logoutUser };
