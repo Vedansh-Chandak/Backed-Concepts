@@ -4,6 +4,7 @@ import { User } from "../modles/user.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { Apiresponse } from "../utils/Apiresponse.js";
 import jwt from 'jsonwebtoken'
+import mongoose from "mongoose";
 
 const generateAccessAndRefereshTokens = async(userId) =>{
     try {
@@ -289,7 +290,124 @@ const updateCoverImage = asynchandler(async(req, res)=>{
   .json(new Apiresponse(200, user, "Cover Image is updated"))
 })
 
+const getUserChannelProfile = asynchandler(async(req, res)=>{
+  const {username} = req.params
+  if(!username?.trim()){
+    throw new ApiError(400, "username is missing")
+  }
+//using aggregate pipelines
+const channel =  await User.aggregate([
+    {
+      $match: {
+        username: username?.toLowerCase()
+      }
+    },
+    {
+      $lookup: {
+        from: 'subcriptions',
+        localField: "_id",
+        foreignField: "channel",
+        as: "subscriber"
+      }
+    },
+    {
+      $lookup: {
+        from: "subcription",
+        localField: "_id",
+        foreignField: "subscirber",
+        as: "subscribeTo"
+      }
+    },
+    {
+      $addFields: {
+        subscriberCount: {
+          $size: "$subscriber"
+        }
+      },
+      channelSubscribeTo: {
+        $size: "subscribeTo"
+      },
+      isSubscribed: {
+        $cond: {
+          if: {$in: [req.user?._id, "$subscriber.subscirber"]},
+          then: true,
+          else: false
+        }
+      }
+    },
+    {
+      $project: {
+        fullname: 1,
+        username: 1,
+        subscriberCount: 1,
+        channelSubscribeTo: 1,
+        isSubscribed:1,
+        avatar: 1 ,
+        coverImage:1,
+        email: 1
+      }
+    }
+  ]
+)
+if(!channel?.length){
+  throw new ApiError(400, "Channel deos not exit")
+}
+
+return res.status(200)
+.json(new Apiresponse(200, channel[0], "User channel fetched successfully"))
+
+})
+
+const getWatchHistory = asynchandler(async(req, res)=>{
+    const user = await aggregate([
+      {
+        $match: {
+          _id: new mongoose.Types.ObjectId(req.user._id)
+        }
+      },
+      {
+        $lookup: {
+          from: 'videos',
+          localField: "watchHistory",
+          foreignField: '_id',
+          as: "watchHistory",
+          pipeline: [
+            {
+              $lookup: {
+                from: "users",
+                localField: 'owner',
+                foreignField: "_id",
+                as: "owner",
+                pipeline: [
+                 {
+                  $project: {
+                    username: 1,
+                   
+                    fullname: 1,
+                    avatar: 1
+                  }
+                 }
+                ]
+              }
+            },
+            {
+              $addFields: {
+                owner: {
+                  $first: "$owner"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ])
+    return res.status(200)
+    .json(new Apiresponse(200, user[0].watchHistory , "watch History fetched successfully") )
+
+})
+
+
 
 export { registerUser, loginUser, logoutUser, refreshAccessToken, getCurrentUser,
    changeCurrentPassword, updatAccountDetail,
-   updateUserAvatar, updateCoverImage };
+   updateUserAvatar, updateCoverImage, getUserChannelProfile, getWatchHistory };
